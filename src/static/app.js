@@ -4,14 +4,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Mantener una copia local de los datos para validaciones
+  let activitiesData = {};
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
       const response = await fetch("/activities");
       const activities = await response.json();
 
-      // Clear loading message
+      // Guardar datos para validaciones posteriores
+      activitiesData = activities;
+
+      // Clear loading message and select options
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -41,12 +48,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Helper: validar si un email ya está registrado en una actividad
+  function isAlreadySignedUp(activityName, email) {
+    if (!activityName || !activitiesData[activityName]) return false;
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    return activitiesData[activityName].participants.some(
+      (p) => (p || "").trim().toLowerCase() === normalizedEmail
+    );
+  }
+
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const email = document.getElementById("email").value;
+    const email = document.getElementById("email").value.trim();
     const activity = document.getElementById("activity").value;
+
+    // Cliente: validar selección y duplicados antes de enviar
+    if (!activity) {
+      messageDiv.textContent = "Selecciona una actividad.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+      return;
+    }
+
+    if (!email) {
+      messageDiv.textContent = "Introduce un correo electrónico válido.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+      return;
+    }
+
+    if (isAlreadySignedUp(activity, email)) {
+      messageDiv.textContent = "Este estudiante ya está registrado en la actividad.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+      return;
+    }
 
     try {
       const response = await fetch(
@@ -62,6 +103,9 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+
+        // Refresh activities to show updated participants/availability
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
